@@ -3,6 +3,7 @@ package simpledb.storage;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.*;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -66,7 +67,12 @@ public class Tuple implements Serializable {
      *            new value for the field.
      */
     public void setField(int i, Field f) {
-        // some code goes here
+       Iterator<Field> flds = this.fields();
+       List<Field> fieldList = new ArrayList<Field>();
+       flds.forEachRemaining(fieldList::add);
+        
+       f= fieldList.get(i);
+
     }
 
     /**
@@ -76,8 +82,12 @@ public class Tuple implements Serializable {
      *            field index to return. Must be a valid index.
      */
     public Field getField(int i) {
-        // some code goes here
-        return null;
+       Iterator<Field> flds = this.fields();
+       List<Field> fieldList = new ArrayList<Field>();
+       flds.forEachRemaining(fieldList::add);
+        
+       return fieldList.get(i);
+
     }
 
     /**
@@ -90,8 +100,17 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        throw new UnsupportedOperationException("Implement this");
-    }
+        String result = "";
+        Iterator<Field> flds = this.fields();
+        List<Field> fieldList = new ArrayList<Field>();
+        flds.forEachRemaining(fieldList::add);
+
+        for(Field fld: fieldList){
+            result+="\t"+fld.toString();
+        }
+
+        return result;
+        }
 
     /**
      * @return

@@ -61,7 +61,13 @@ public class TupleDesc implements Serializable {
      *            be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
-        // some code goes here
+        if (typeAr.length >0){
+        HashMap<Type, String> attributes = new HashMap<Type, String>();
+        for (int i = 0; i< typeAr.length; i++){
+            attributes.putIfAbsent(typeAr[i], fieldAr[i]);
+        }
+    }
+        
     }
 
     /**
