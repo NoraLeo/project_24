@@ -15,8 +15,17 @@ public class TupleTest extends SimpleDbTestBase {
      * Unit test for Tuple.getField() and Tuple.setField()
      */
     @Test public void modifyFields() {
-        TupleDesc td = Utility.getTupleDesc(2);
-
+        TupleDesc td = Utility.getTupleDesc(2); 
+        // TupleDesc getTupleDesc(int n) --> return new TupleDesc(getTypes(n))
+        // Type[] getTypes(int len) {
+        //     Type[] types = new Type[len];
+      
+        //     for(int i = 0; i < len; ++i) {
+        //        types[i] = Type.INT_TYPE;
+        //     }
+      
+        //     return types;
+        //  }
         Tuple tup = new Tuple(td);
         tup.setField(0, new IntField(-1));
         tup.setField(1, new IntField(0));
@@ -39,7 +48,7 @@ public class TupleTest extends SimpleDbTestBase {
         Tuple tup = new Tuple(td);
         assertEquals(td, tup.getTupleDesc());
     }
-
+    
     /**
      * Unit test for Tuple.getRecordId() and Tuple.setRecordId()
      */

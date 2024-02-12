@@ -1,9 +1,9 @@
 package simpledb.storage;
 
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.*;
+
+import simpledb.common.*;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -13,8 +13,9 @@ import java.util.*;
 public class Tuple implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private TupleDesc td;
+    private TupleDesc tupleDesc;
     private RecordId recordId;
+    private Field[] fieldList;
     /**
      * Create a new tuple with the specified schema (type).
      *
@@ -24,8 +25,9 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         // some code goes here
-        this.td = td;
+        this.tupleDesc = td;
         this.recordId = null;
+        this.fieldList = new Field[td.numFields()];
     }
 
     /**
@@ -33,7 +35,7 @@ public class Tuple implements Serializable {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return this.td;
+        return this.tupleDesc;
         // return null;
     }
 
@@ -67,12 +69,8 @@ public class Tuple implements Serializable {
      *            new value for the field.
      */
     public void setField(int i, Field f) {
-       Iterator<Field> flds = this.fields();
-       List<Field> fieldList = new ArrayList<Field>();
-       flds.forEachRemaining(fieldList::add);
-        
-       f= fieldList.get(i);
-
+        // some code goes here
+        this.fieldList[i] = f;
     }
 
     /**
@@ -82,12 +80,7 @@ public class Tuple implements Serializable {
      *            field index to return. Must be a valid index.
      */
     public Field getField(int i) {
-       Iterator<Field> flds = this.fields();
-       List<Field> fieldList = new ArrayList<Field>();
-       flds.forEachRemaining(fieldList::add);
-        
-       return fieldList.get(i);
-
+        return this.fieldList[i];
     }
 
     /**
@@ -101,32 +94,27 @@ public class Tuple implements Serializable {
     public String toString() {
         // some code goes here
         String result = "";
-        Iterator<Field> flds = this.fields();
-        List<Field> fieldList = new ArrayList<Field>();
-        flds.forEachRemaining(fieldList::add);
 
-        for(Field fld: fieldList){
-            result+="\t"+fld.toString();
+        for(Field field: fieldList){
+            result+="\t" + field.toString();
         }
 
         return result;
-        }
+    }
 
     /**
      * @return
      *        An iterator which iterates over all the fields of this tuple
      * */
-    public Iterator<Field> fields()
-    {
+    public Iterator<Field> fields() {
         // some code goes here
-        return null;
+        return Arrays.asList(this.fieldList).iterator();
     }
 
     /**
      * reset the TupleDesc of this tuple (only affecting the TupleDesc)
-     * */
-    public void resetTupleDesc(TupleDesc td)
-    {
+     */
+    public void resetTupleDesc(TupleDesc td) {
         // some code goes here
     }
 }

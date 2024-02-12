@@ -10,13 +10,13 @@ import java.util.*;
  */
 public class TupleDesc implements Serializable {
 
+    private TDItem[] TDItemList;
     /**
      * A help class to facilitate organizing the information of each field
      * */
     public static class TDItem implements Serializable {
 
         private static final long serialVersionUID = 1L;
-
         /**
          * The type of the field
          * */
@@ -44,7 +44,7 @@ public class TupleDesc implements Serializable {
      * */
     public Iterator<TDItem> iterator() {
         // some code goes here
-        return null;
+        return Arrays.asList(this.TDItemList).iterator();
     }
 
     private static final long serialVersionUID = 1L;
@@ -61,12 +61,15 @@ public class TupleDesc implements Serializable {
      *            be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
-        if (typeAr.length >0){
-        HashMap<Type, String> attributes = new HashMap<Type, String>();
-        for (int i = 0; i< typeAr.length; i++){
-            attributes.putIfAbsent(typeAr[i], fieldAr[i]);
+        // some code goes here
+        this.TDItemList = new TDItem[(typeAr.length)];
+        for (int i = 0; i < typeAr.length; i++) {
+            if (fieldAr[i] != null) {
+                this.TDItemList[i]= new TDItem(typeAr[i], fieldAr[i]);
+            } else {
+                this.TDItemList[i]= new TDItem(typeAr[i], null);
+            }
         }
-    }
         
     }
 
@@ -80,6 +83,10 @@ public class TupleDesc implements Serializable {
      */
     public TupleDesc(Type[] typeAr) {
         // some code goes here
+        this.TDItemList = new TDItem[(typeAr.length)];
+        for (int i = 0; i < typeAr.length; i++) {
+            this.TDItemList[i] = new TDItem(typeAr[i], null);
+        }
     }
 
     /**
@@ -87,7 +94,7 @@ public class TupleDesc implements Serializable {
      */
     public int numFields() {
         // some code goes here
-        return 0;
+        return this.TDItemList.length;
     }
 
     /**
@@ -101,7 +108,7 @@ public class TupleDesc implements Serializable {
      */
     public String getFieldName(int i) throws NoSuchElementException {
         // some code goes here
-        return null;
+        return this.TDItemList[i].fieldName;
     }
 
     /**
@@ -116,7 +123,7 @@ public class TupleDesc implements Serializable {
      */
     public Type getFieldType(int i) throws NoSuchElementException {
         // some code goes here
-        return null;
+        return this.TDItemList[i].fieldType;
     }
 
     /**
@@ -130,7 +137,18 @@ public class TupleDesc implements Serializable {
      */
     public int fieldNameToIndex(String name) throws NoSuchElementException {
         // some code goes here
-        return 0;
+        int ans = -1;
+        for (int i = 0; i < this.TDItemList.length; i++) {
+            if (this.TDItemList[i].fieldName != null && this.TDItemList[i].fieldName.equals(name)) {
+                ans = i;
+                break;
+            }
+        }
+        if (ans != -1) {
+            return ans;
+        } else {
+            throw new NoSuchElementException("No field with a matching name is found");
+        }
     }
 
     /**
@@ -139,7 +157,11 @@ public class TupleDesc implements Serializable {
      */
     public int getSize() {
         // some code goes here
-        return 0;
+        int size = 0;
+        for (int i = 0; i < this.TDItemList.length; i++) {
+            size += this.TDItemList[i].fieldType.getLen();
+        }
+        return size;
     }
 
     /**
@@ -154,7 +176,24 @@ public class TupleDesc implements Serializable {
      */
     public static TupleDesc merge(TupleDesc td1, TupleDesc td2) {
         // some code goes here
-        return null;
+        int len = td1.numFields() + td2.numFields();
+        Type[] typeAr = new Type[len];
+        TupleDesc newTD = new TupleDesc(typeAr);
+        for (int i = 0; i < td1.numFields(); i++) {
+            if (td1.getFieldName(i) != null) {
+                newTD.TDItemList[i]= new TDItem( td1.getFieldType(i), td1.getFieldName(i) );
+            } else {
+                newTD.TDItemList[i]= new TDItem( td1.getFieldType(i), null);
+            }
+        }
+        for (int i = td1.numFields(); i < len; i++) {
+            if (td2.getFieldName(i - td1.numFields()) != null) {
+                newTD.TDItemList[i]= new TDItem( td2.getFieldType(i - td1.numFields()), td2.getFieldName(i - td1.numFields()) );
+            } else {
+                newTD.TDItemList[i]= new TDItem(td2.getFieldType(i - td1.numFields()), null);
+            }
+        }
+        return newTD;
     }
 
     /**

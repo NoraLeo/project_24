@@ -68,7 +68,6 @@ public class CatalogTest extends SimpleDbTestBase {
     /**
      * Unit test for Catalog.getDatabaseFile()
      */
-
     @Test public void getDatabaseFile() {
         DbFile f = Database.getCatalog().getDatabaseFile(id1);
 
