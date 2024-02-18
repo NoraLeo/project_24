@@ -209,6 +209,20 @@ public class TupleDesc implements Serializable {
 
     public boolean equals(Object o) {
         // some code goes here
+        // check if number of items in the TupleDesc is the same
+        if (o instanceof TupleDesc) {
+            TupleDesc td = (TupleDesc) o;
+            if (td.numFields() != this.numFields()) {
+                return false;
+            }
+            // check if the i-th type in this TupleDesc is equal to the i-th type in o for every i
+            for (int i = 0; i < this.numFields(); i++) {
+                if (td.getFieldType(i) != this.getFieldType(i)) {
+                    return false;
+                }
+            }
+            return true;
+        }
         return false;
     }
 
