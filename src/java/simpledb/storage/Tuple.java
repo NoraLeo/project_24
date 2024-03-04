@@ -116,5 +116,6 @@ public class Tuple implements Serializable {
      */
     public void resetTupleDesc(TupleDesc td) {
         // some code goes here
+        this.tupleDesc = null;
     }
 }
