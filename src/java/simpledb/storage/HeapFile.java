@@ -22,8 +22,7 @@ import java.util.*;
  */
 public class HeapFile implements DbFile {
     private File file;
-    private TupleDesc td;
-
+    private TupleDesc td;	
     /**
      * Constructs a heap file backed by the specified file.
      * 
@@ -32,8 +31,8 @@ public class HeapFile implements DbFile {
      *            file.
      */
     public HeapFile(File f, TupleDesc td) {
-        //constructor
-        this.file = f;
+        // some code goes here
+	    this.file = f;
         this.td = td;
     }
 
@@ -43,7 +42,8 @@ public class HeapFile implements DbFile {
      * @return the File backing this HeapFile on disk.
      */
     public File getFile() {
-        return this.file;
+        // some code goes here
+         return this.file;
     }
 
     /**
@@ -66,10 +66,13 @@ public class HeapFile implements DbFile {
      * @return TupleDesc of this DbFile.
      */
     public TupleDesc getTupleDesc() {
-        return this.td;
+        // some code goes here
+         return this.td;
     }
 
+    // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
+        // some code goes here
         Page page = null;
         try {
             RandomAccessFile raf = new RandomAccessFile(this.file, "r");
@@ -83,7 +86,7 @@ public class HeapFile implements DbFile {
             e.printStackTrace();
         }
         return page;
-}
+    }
 
     // see DbFile.java for javadocs
     public void writePage(Page page) throws IOException {
@@ -95,6 +98,7 @@ public class HeapFile implements DbFile {
      * Returns the number of pages in this HeapFile.
      */
     public int numPages() {
+        // some code goes here
         return (int) Math.ceil(this.file.length() / BufferPool.getPageSize());
     }
 
@@ -102,26 +106,54 @@ public class HeapFile implements DbFile {
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        ArrayList<Page> modifiedPages = new ArrayList<>();
+        for (int currentPageNo = 0; currentPageNo < this.numPages(); currentPageNo++) {
+            HeapPageId pageId = new HeapPageId(this.getId(), currentPageNo);
+            HeapPage currentPage = (HeapPage)Database.getBufferPool().getPage(tid, pageId, Permissions.READ_ONLY);
+            if (currentPage.getNumEmptySlots() > 0) {
+                // Upgrade read lock to write lock
+                currentPage = (HeapPage)Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
+                currentPage.insertTuple(t);
+                modifiedPages.add(currentPage);
+                break;
+            } 
+        }
+
+        if (modifiedPages.isEmpty()) {
+            HeapPage newPage = new HeapPage(new HeapPageId(getId(), numPages()), new byte[BufferPool.getPageSize()]);
+            newPage.insertTuple(t);
+            this.writePage(newPage);
+            modifiedPages.add(newPage);
+        }
+
+        return modifiedPages;
     }
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
         // some code goes here
-        return null;
         // not necessary for lab1
+        PageId pid = t.getRecordId().getPageId();
+        ArrayList<Page> affectedPages = new ArrayList<>();
+        for (int i = 0; i < numPages(); i++) {
+            if (i == pid.getPageNumber()) {
+                HeapPage affectedPage = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_WRITE);
+                affectedPage.deleteTuple(t);
+                affectedPages.add(affectedPage);
+            }
+        }
+
+        if (affectedPages.isEmpty()) {
+            throw new DbException("Tuple " + t + " is not in this table.");
+        }
+        return affectedPages;
     }
 
-    /*
-     * You will also need to implement the `HeapFile.iterator()` 
-     * method, which should iterate through the tuples of 
-     * each page in the HeapFile. 
-     * The iterator must use the `BufferPool.getPage()` method
-     *  to access pages in the `HeapFile`. This method loads the page into the buffer pool and will eventually be used (in a later lab) to implement locking-based concurrency control and recovery. Do not load the entire table into memory on the open() call -- this will cause an out of memory error for very large tables.
-     */
+    // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
+        // some code goes here
         return new DbFileIterator() {
             private int currentPageNum;
             private Iterator<Tuple> currentIterator;
@@ -178,4 +210,3 @@ public class HeapFile implements DbFile {
     }
 
 }
-

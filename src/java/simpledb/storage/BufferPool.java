@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+
 
 import javax.xml.crypto.Data;
 
@@ -159,9 +161,19 @@ public class BufferPool {
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        // not necessary for lab1
-    }
+        DbFile file = Database.getCatalog().getDatabaseFile(tableId);
+        if (file == null) {
+            throw new DbException("Table not found: " + tableId);
+        }
+
+        List<Page> modifiedPages = file.insertTuple(tid, t);
+
+        // Mark all modified pages as dirty and update them in the buffer pool
+        for (Page modifiedPage : modifiedPages) {
+            modifiedPage.markDirty(true, tid);
+            updatePageInBufferPool(modifiedPage);
+        }
+    }   
 
     /**
      * Remove the specified tuple from the buffer pool.
@@ -176,10 +188,28 @@ public class BufferPool {
      * @param tid the transaction deleting the tuple.
      * @param t the tuple to delete
      */
-    public  void deleteTuple(TransactionId tid, Tuple t)
+    public void deleteTuple(TransactionId tid, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        // not necessary for lab1
+        int tableId = t.getRecordId().getPageId().getTableId();
+        DbFile file = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> modifiedPages = file.deleteTuple(tid, t);
+
+        // Mark all modified pages as dirty and update them in the buffer pool
+        for (Page modifiedPage : modifiedPages) {
+            modifiedPage.markDirty(true, tid);
+            updatePageInBufferPool(modifiedPage);
+        }
+    }
+    private synchronized void updatePageInBufferPool(Page page) 
+        throws DbException, IOException, TransactionAbortedException{
+        if (!this.pagePool.containsKey(page.getId()) && this.pagePool.size() >= this.numPage) {
+            this.evictPage(); // If the buffer pool is full, evict a page
+        }
+
+        this.pagePool.remove(page.getId());
+        
+        // Update the page in the buffer pool
+        this.pagePool.put(page.getId(), page);
     }
 
     /**
