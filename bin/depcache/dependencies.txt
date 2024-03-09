@@ -2676,6 +2676,7 @@ java.lang.invoke.StringConcatFactory
 java.io.RandomAccessFile
 java.io.IOException
 simpledb.storage.DbFile
+java.lang.Throwable
 simpledb.storage.Tuple
 java.lang.invoke.MethodHandles$Lookup
 simpledb.storage.Page

@@ -2,7 +2,6 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.Debug;
 import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
@@ -92,6 +91,10 @@ public class HeapFile implements DbFile {
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
+        try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
+            raf.seek(page.getId().getPageNumber() * Database.getBufferPool().getPageSize());
+            raf.write(page.getPageData());
+        }
     }
 
     /**
@@ -112,7 +115,6 @@ public class HeapFile implements DbFile {
             HeapPageId pageId = new HeapPageId(this.getId(), currentPageNo);
             HeapPage currentPage = (HeapPage)Database.getBufferPool().getPage(tid, pageId, Permissions.READ_ONLY);
             if (currentPage.getNumEmptySlots() > 0) {
-                // Upgrade read lock to write lock
                 currentPage = (HeapPage)Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
                 currentPage.insertTuple(t);
                 modifiedPages.add(currentPage);
