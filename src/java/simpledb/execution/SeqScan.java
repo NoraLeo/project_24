@@ -82,7 +82,7 @@ public class SeqScan implements OpIterator {
      */
     public void reset(int tableid, String tableAlias) {
         // some code goes here
-	this.tableid = tableid;
+	    this.tableid = tableid;
         this.tableAlias = tableAlias;
         this.file = Database.getCatalog().getDatabaseFile(this.tableid);
         this.fileIterator = this.file.iterator(this.tid);

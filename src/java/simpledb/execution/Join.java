@@ -17,6 +17,7 @@ public class Join extends Operator {
     private OpIterator child1;
     private OpIterator child2;
     private Tuple currentChild1Tuple;
+    private boolean all_child1_checked = false;
     private boolean all_child2_checked = false;
     /**
      * Constructor. Accepts two children to join and the predicate to join them
@@ -126,11 +127,11 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        while(this.child1.hasNext()){
+        while(this.child1.hasNext() || all_child1_checked == false){
             // if null, current = next
             // if hvnt done checking all child2 to match 1 child1, then current
             // if check all child2 to match 1 child1, then next
-            if(this.currentChild1Tuple == null || all_child2_checked == true){
+            if(this.currentChild1Tuple == null || this.all_child2_checked == true){
                 this.currentChild1Tuple = this.child1.next();
                 this.child2.rewind();
                 all_child2_checked = false;
@@ -143,6 +144,9 @@ public class Join extends Operator {
                 }
             }
             this.all_child2_checked = true;
+            if(this.child1.hasNext() == false){
+                all_child1_checked = true;
+            }
         }
         return null;
     }
