@@ -1,12 +1,28 @@
 package simpledb.execution;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import simpledb.common.Database;
 import simpledb.common.Type;
+import simpledb.storage.Field;
+import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
+import simpledb.storage.TupleIterator;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
  */
 public class IntegerAggregator implements Aggregator {
+    private int gbfield;
+    private Type gbfieldtype;
+    private int afield;
+    private Op what;
+    private HashMap<Field, Integer> groupAggregates;
+    private HashMap<Field, Integer> groupCounts;
+    private int noGroupAggregate;
+    private int noGroupCount;
 
     private static final long serialVersionUID = 1L;
 
@@ -26,8 +42,17 @@ public class IntegerAggregator implements Aggregator {
      */
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+
+        this.gbfield = gbfield;
+        this.gbfieldtype = gbfieldtype;
+        this.afield = afield;
+        this.what = what;
+        this.groupAggregates = new HashMap<>();
+        this.groupCounts = new HashMap<>();
+        this.noGroupAggregate = 0;
+        this.noGroupCount = 0;
     }
+
 
     /**
      * Merge a new tuple into the aggregate, grouping as indicated in the
@@ -37,21 +62,64 @@ public class IntegerAggregator implements Aggregator {
      *            the Tuple containing an aggregate field and a group-by field
      */
     public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+        Field groupField = gbfield == NO_GROUPING ? null : tup.getField(gbfield);
+                
+                if (groupField == null) {
+                    // No grouping
+                    noGroupAggregate = aggregate(noGroupAggregate, tup.getField(afield).hashCode());
+                    noGroupCount++;
+                } else {
+                    // Grouping
+                    if (!groupAggregates.containsKey(groupField)) {
+                        groupAggregates.put(groupField, tup.getField(afield).hashCode());
+                        groupCounts.put(groupField, 1);
+                    } else {
+                        int currentValue = groupAggregates.get(groupField);
+                        int newValue = aggregate(currentValue, tup.getField(afield).hashCode());
+                        groupAggregates.put(groupField, newValue);
+                        groupCounts.put(groupField, groupCounts.get(groupField) + 1);
+                    }
+                }
+    
     }
 
-    /**
-     * Create a OpIterator over group aggregate results.
-     * 
-     * @return a OpIterator whose tuples are the pair (groupVal, aggregateVal)
-     *         if using group, or a single (aggregateVal) if no grouping. The
-     *         aggregateVal is determined by the type of aggregate specified in
-     *         the constructor.
-     */
+    @Override
     public OpIterator iterator() {
-        // some code goes here
-        throw new
-        UnsupportedOperationException("please implement me for lab2");
+        List<Tuple> tuples = new ArrayList<>();
+
+        if (gbfield == NO_GROUPING) {
+            Tuple tuple = new Tuple(Database.getCatalog().getTupleDesc(NO_GROUPING));
+            tuple.setField(0, new IntField(noGroupAggregate));
+            tuples.add(tuple);
+        } else {
+            for (Field groupField : groupAggregates.keySet()) {
+
+                Tuple tuple = new Tuple(Database.getCatalog().getTupleDesc(gbfield));
+                tuple.setField(0, groupField);
+                tuple.setField(1, new IntField(groupAggregates.get(groupField)));
+                tuples.add(tuple);
+            }
+        }
+
+        return new TupleIterator(Database.getCatalog().getTupleDesc(gbfield), tuples);
     }
 
+    private int aggregate(int value1, int value2) {
+        switch (what) {
+            case MIN:
+                return Math.min(value1, value2);
+            case MAX:
+                return Math.max(value1, value2);
+            case SUM:
+                return value1 + value2;
+            case AVG:
+                return value1 + value2;
+            case COUNT:
+                return value1 + 1;
+            default:
+                throw new UnsupportedOperationException("Unsupported aggregation operator");
+        }
+    }
 }
+
+
