@@ -47,8 +47,8 @@ public class Delete extends Operator {
 
     public void open() throws DbException, TransactionAbortedException {
         // some code goes here
-        this.child.open();
         super.open();
+        this.child.open();
     }
 
     public void close() {
@@ -86,7 +86,7 @@ public class Delete extends Operator {
             try {
                 Database.getBufferPool().deleteTuple(this.t, tuple);
                 count++;
-            } catch (IOException e) {
+            } catch (TransactionAbortedException | DbException | IOException e){
                 e.printStackTrace();
             }
         }
