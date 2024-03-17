@@ -10,7 +10,9 @@ import simpledb.storage.Field;
 import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleIterator;
+import simpledb.storage.TupleDesc;
 
+import java.util.HashMap;
 /**
  * Knows how to compute some aggregate over a set of IntFields.
  */
@@ -86,22 +88,24 @@ public class IntegerAggregator implements Aggregator {
     @Override
     public OpIterator iterator() {
         List<Tuple> tuples = new ArrayList<>();
-
+    
+        TupleDesc tupleDesc;
         if (gbfield == NO_GROUPING) {
-            Tuple tuple = new Tuple(Database.getCatalog().getTupleDesc(NO_GROUPING));
+            tupleDesc = new TupleDesc(new Type[]{Type.INT_TYPE});
+            Tuple tuple = new Tuple(tupleDesc);
             tuple.setField(0, new IntField(noGroupAggregate));
             tuples.add(tuple);
         } else {
+            tupleDesc = new TupleDesc(new Type[]{gbfieldtype, Type.INT_TYPE});
             for (Field groupField : groupAggregates.keySet()) {
-
-                Tuple tuple = new Tuple(Database.getCatalog().getTupleDesc(gbfield));
+                Tuple tuple = new Tuple(tupleDesc);
                 tuple.setField(0, groupField);
                 tuple.setField(1, new IntField(groupAggregates.get(groupField)));
                 tuples.add(tuple);
             }
         }
-
-        return new TupleIterator(Database.getCatalog().getTupleDesc(gbfield), tuples);
+    
+        return new TupleIterator(tupleDesc, tuples);
     }
 
     private int aggregate(int value1, int value2) {
@@ -113,7 +117,7 @@ public class IntegerAggregator implements Aggregator {
             case SUM:
                 return value1 + value2;
             case AVG:
-                return value1 + value2;
+                return ((value1 + value2))/2;
             case COUNT:
                 return value1 + 1;
             default:
@@ -121,5 +125,3 @@ public class IntegerAggregator implements Aggregator {
         }
     }
 }
-
-
