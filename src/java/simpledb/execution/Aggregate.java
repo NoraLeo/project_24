@@ -40,7 +40,6 @@ public class Aggregate extends Operator {
      * @param aop    The aggregation operator to use
      */
     public Aggregate(OpIterator child, int afield, int gfield, Aggregator.Op aop) {
-        super();
         this.child = child;
         this.afield = afield;
         this.gfield = gfield;
@@ -70,8 +69,9 @@ public class Aggregate extends Operator {
     public String groupFieldName() {
         if (this.gfield == -1) {
             return null;
+        } else {
+            return this.childTd.getFieldName(this.gfield);
         }
-        return this.childTd.getFieldName(gfield);
     }
 
     /**
