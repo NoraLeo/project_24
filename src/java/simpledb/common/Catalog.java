@@ -43,18 +43,18 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
-	Integer tableId=file.getId();
-	if(name==null){
-	    throw new  IllegalArgumentException("Name should not be empty.");
-	}
-	else{
-	    if(this.catalogMap.containsKey(tableId)){
-	        this.catalogMap.remove(tableId);
+	    Integer tableId=file.getId();
+	    if(name==null){
+	        throw new  IllegalArgumentException("Name should not be empty.");
 	    }
-	    this.catalogMap.entrySet().removeIf(entry -> entry.getValue().getName() == name);
-	    Table t = new Table(file, name, pkeyField);
+	    else{
+	        if(this.catalogMap.containsKey(tableId)){
+	            this.catalogMap.remove(tableId);
+	        }
+	        this.catalogMap.entrySet().removeIf(entry -> entry.getValue().getName() == name);
+	        Table t = new Table(file, name, pkeyField);
             this.catalogMap.put(tableId, t);
-	}
+	    }
     }
 
     public void addTable(DbFile file, String name) {
@@ -110,7 +110,7 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-	if (this.catalogMap.containsKey(tableid)) {
+	    if (this.catalogMap.containsKey(tableid)) {
             return this.catalogMap.get(tableid).getFile();
         } else {
             throw new NoSuchElementException("No such table with such a name exists.");
@@ -144,7 +144,7 @@ public class Catalog {
     /** Delete all tables from the catalog */
     public void clear() {
         // some code goes here
-	this.catalogMap.clear();
+	    this.catalogMap.clear();
     }
     
     /**

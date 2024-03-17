@@ -1,7 +1,6 @@
 package simpledb.execution;
 
 import java.io.IOException;
-
 import simpledb.common.Type;
 import simpledb.common.Database;
 import simpledb.common.DbException;
@@ -22,6 +21,8 @@ public class Insert extends Operator {
     private TransactionId t;
     private OpIterator child;
     private int tableId;
+    private TupleDesc td;
+    private boolean fetched = false;
     /**
      * Constructor.
      *
@@ -41,6 +42,7 @@ public class Insert extends Operator {
         this.t = t;
         this.child = child;
         this.tableId = tableId;
+        this.td = new TupleDesc(new Type[] {Type.INT_TYPE});
         if (!child.getTupleDesc().equals(Database.getCatalog().getTupleDesc(tableId))) {
             throw new DbException("TupleDesc of child differs from table into which we are to insert");
         }
@@ -49,7 +51,7 @@ public class Insert extends Operator {
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return new TupleDesc(new Type[] {Type.INT_TYPE});
+        return this.td;
     }
     
 
@@ -57,6 +59,7 @@ public class Insert extends Operator {
         // some code goes here
         super.open();
         this.child.open();
+        this.fetched = false;
     }
 
     public void close() {
@@ -68,6 +71,8 @@ public class Insert extends Operator {
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
         this.child.rewind();
+        this.close();
+        this.open();
     }
 
     /**
@@ -85,7 +90,12 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+        if (this.fetched) {
+            return null;
+        }
         int count = 0;
+        this.fetched = true;
+        
         while (this.child.hasNext()) {
             Tuple tuple = this.child.next();
             count++;
@@ -95,7 +105,8 @@ public class Insert extends Operator {
                 e.printStackTrace();
             }
         }
-        Tuple result = new Tuple(this.child.getTupleDesc());
+
+        Tuple result = new Tuple(this.td);
         result.setField(0, new IntField(count));
         return result;
     }
