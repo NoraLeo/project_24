@@ -66,22 +66,22 @@ public class IntegerAggregator implements Aggregator {
     public void mergeTupleIntoGroup(Tuple tup) {
         Field groupField = gbfield == NO_GROUPING ? null : tup.getField(gbfield);
                 
-                if (groupField == null) {
-                    // No grouping
-                    noGroupAggregate = aggregate(noGroupAggregate, tup.getField(afield).hashCode());
-                    noGroupCount++;
-                } else {
-                    // Grouping
-                    if (!groupAggregates.containsKey(groupField)) {
-                        groupAggregates.put(groupField, tup.getField(afield).hashCode());
-                        groupCounts.put(groupField, 1);
-                    } else {
-                        int currentValue = groupAggregates.get(groupField);
-                        int newValue = aggregate(currentValue, tup.getField(afield).hashCode());
-                        groupAggregates.put(groupField, newValue);
-                        groupCounts.put(groupField, groupCounts.get(groupField) + 1);
-                    }
-                }
+        if (groupField == null) {
+            // No grouping
+            noGroupAggregate = aggregate(noGroupAggregate, tup.getField(afield).hashCode());
+            this.noGroupCount++;
+        } else {
+            // Grouping
+            if (!groupAggregates.containsKey(groupField)) {
+                groupAggregates.put(groupField, tup.getField(afield).hashCode());
+                groupCounts.put(groupField, 1);
+            } else {
+                int currentValue = groupAggregates.get(groupField);
+                int newValue = aggregate(currentValue, tup.getField(afield).hashCode());
+                groupAggregates.put(groupField, newValue);
+                groupCounts.put(groupField, groupCounts.get(groupField) + 1);
+            }
+        }
     
     }
 
@@ -93,14 +93,29 @@ public class IntegerAggregator implements Aggregator {
         if (gbfield == NO_GROUPING) {
             tupleDesc = new TupleDesc(new Type[]{Type.INT_TYPE});
             Tuple tuple = new Tuple(tupleDesc);
-            tuple.setField(0, new IntField(noGroupAggregate));
+            if (what == Op.AVG) {
+                tuple.setField(0, new IntField(noGroupAggregate / noGroupCount));
+            } else if (what == Op.COUNT) {
+                tuple.setField(0, new IntField(noGroupCount));
+            } else {
+                tuple.setField(0, new IntField(noGroupAggregate));
+            }
             tuples.add(tuple);
         } else {
             tupleDesc = new TupleDesc(new Type[]{gbfieldtype, Type.INT_TYPE});
             for (Field groupField : groupAggregates.keySet()) {
                 Tuple tuple = new Tuple(tupleDesc);
-                tuple.setField(0, groupField);
-                tuple.setField(1, new IntField(groupAggregates.get(groupField)));
+                if (what == Op.AVG) {
+                    tuple.setField(0, groupField);
+                    tuple.setField(1, new IntField(groupAggregates.get(groupField) /
+                                                    groupCounts.get(groupField)));
+                } else if (what == Op.COUNT) {
+                    tuple.setField(0, groupField);
+                    tuple.setField(1, new IntField(groupCounts.get(groupField)));
+                } else {
+                    tuple.setField(0, groupField);
+                    tuple.setField(1, new IntField(groupAggregates.get(groupField)));
+                }
                 tuples.add(tuple);
             }
         }
@@ -117,7 +132,7 @@ public class IntegerAggregator implements Aggregator {
             case SUM:
                 return value1 + value2;
             case AVG:
-                return ((value1 + value2))/2;
+                return value1 + value2;
             case COUNT:
                 return value1 + 1;
             default:
