@@ -47,6 +47,7 @@ public class BufferPool {
     private final int numPage;
 
     private final Map<PageId, Page> pagePool;
+    lockManager lockManager = new lockManager();
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -100,8 +101,14 @@ public class BufferPool {
             }
 
             Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            //lock the page
+            synchronized (this){
+                pagePool.put(pid, page);
+            }
             this.pagePool.put(pid, page);
             return page;
+
+            
     }
 
     /**
@@ -124,14 +131,19 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        lockManager.releaseLock(tid, null);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        // Add implementation here
+        // Check if the page is present in the page pool
+        if (pagePool.containsKey(p)) {
+            // Get the page from the page pool
+            Page page = pagePool.get(p);
+            // Check if the page is locked by the specified transaction
+            return page.isDirty() == tid;
+        }
         return false;
     }
 
@@ -143,9 +155,27 @@ public class BufferPool {
      * @param commit a flag indicating whether we should commit or abort
      */
     public void transactionComplete(TransactionId tid, boolean commit) {
-        // some code goes here
-        // not necessary for lab1|lab2
-    }
+        if(commit && holdsLock(tid, null)){
+            try {
+                flushPages(tid);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                // Add any necessary code here
+            }
+        }else{
+            for(PageId pid:this.pagePool.keySet()){
+                if(this.pagePool.get(pid).isDirty()!=null){
+                    try {
+                        discardPage(pid);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+        }
+        }
 
     /**
      * Add a tuple to the specified table on behalf of transaction tid.  Will
@@ -167,6 +197,10 @@ public class BufferPool {
              DbFile file = Database.getCatalog().getDatabaseFile(tableId);
 
              List<Page> modifiedPages = file.insertTuple(tid, t);
+             lockManager.acquireLock(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+             if (modifiedPages == null) {
+                 throw new DbException("The specified tuple could not be inserted.");
+             }
 
             // Mark all modified pages as dirty and update them in the buffer pool
             synchronized (this){
@@ -195,6 +229,10 @@ public class BufferPool {
         int tableId = t.getRecordId().getPageId().getTableId();
         DbFile file = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> modifiedPages = file.deleteTuple(tid, t);
+        lockManager.acquireLock(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);  
+        if (modifiedPages == null) {
+            throw new DbException("The specified tuple could not be deleted.");
+        }
 
         // Mark all modified pages as dirty and update them in the buffer pool
         for (Page modifiedPage : modifiedPages) {
@@ -270,8 +308,12 @@ public class BufferPool {
     /** Write all pages of the specified transaction to disk.
      */
     public synchronized  void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        for (PageId pid : this.pagePool.keySet()) {
+            Page pg = this.pagePool.get(pid);
+            if (pg.isDirty() == tid) {
+                this.flushPage(pid);
+            }
+        }
     }
 
     /**
@@ -302,6 +344,72 @@ public class BufferPool {
             throw new DbException("The specified page could not be flushed.");
         }
         this.pagePool.remove(lastruPage.getId());
+    }
+
+    private class lockManager {
+        private Map<PageId, Set<TransactionId>> sharedLocks;
+        private Map<PageId, TransactionId> exclusiveLocks;
+
+        public lockManager() {
+            this.sharedLocks = new ConcurrentHashMap<>();
+            this.exclusiveLocks = new ConcurrentHashMap<>();
+        }
+
+        public synchronized boolean acquireLock(TransactionId tid, PageId pid, Permissions perm)
+            throws TransactionAbortedException {
+            if (perm == Permissions.READ_ONLY) {
+                return acquireSharedLock(tid, pid);
+            } else {
+                return acquireExclusiveLock(tid, pid);
+            }
+        }
+
+        private synchronized boolean acquireSharedLock(TransactionId tid, PageId pid)
+            throws TransactionAbortedException {
+            if (!this.sharedLocks.containsKey(pid)) {
+                this.sharedLocks.put(pid, new HashSet<>());
+            }
+
+            if (this.exclusiveLocks.containsKey(pid) && this.exclusiveLocks.get(pid) != tid) {
+                return false;
+            }
+
+            this.sharedLocks.get(pid).add(tid);
+            return true;
+        }
+
+        private synchronized boolean acquireExclusiveLock(TransactionId tid, PageId pid)
+            throws TransactionAbortedException {
+            if (this.sharedLocks.containsKey(pid) && this.sharedLocks.get(pid).size() > 1) {
+                return false;
+            }
+
+            if (this.sharedLocks.containsKey(pid) && this.sharedLocks.get(pid).size() == 1 && !this.sharedLocks.get(pid).contains(tid)) {
+                return false;
+            }
+
+            if (this.exclusiveLocks.containsKey(pid) && this.exclusiveLocks.get(pid) != tid) {
+                return false;
+            }
+
+            this.exclusiveLocks.put(pid, tid);
+            return true;
+        }
+
+        public synchronized void releaseLock(TransactionId tid, PageId pid) {
+            if (this.sharedLocks.containsKey(pid) && this.sharedLocks.get(pid).contains(tid)) {
+                this.sharedLocks.get(pid).remove(tid);
+            }
+
+            if (this.exclusiveLocks.containsKey(pid) && this.exclusiveLocks.get(pid) == tid) {
+                this.exclusiveLocks.remove(pid);
+            }
+        }
+
+        public synchronized boolean holdsLock(TransactionId tid, PageId pid) {
+            return (this.sharedLocks.containsKey(pid) && this.sharedLocks.get(pid).contains(tid)) ||
+                (this.exclusiveLocks.containsKey(pid) && this.exclusiveLocks.get(pid) == tid);}
+
     }
 
 }
