@@ -194,11 +194,10 @@ public class BufferPool {
              List<Page> modifiedPages = file.insertTuple(tid, t);
 
             // Mark all modified pages as dirty and update them in the buffer pool
-            synchronized (this){
-                for (Page modifiedPage : modifiedPages) {
-                    modifiedPage.markDirty(true, tid);
-                    updatePageInBufferPool(modifiedPage);
-                }
+
+            for (Page modifiedPage : modifiedPages) {
+                modifiedPage.markDirty(true, tid);
+                updatePageInBufferPool(modifiedPage);
             }
     }   
 
@@ -247,9 +246,11 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-        for(Page p:this.pagePool.values()){
-            if(p.isDirty()!=null){
-                flushPage(p.getId());
+        synchronized(this){
+            for(Page p:this.pagePool.values()){
+                if(p.isDirty()!=null){
+                    flushPage(p.getId());
+                }
             }
         }
     }
