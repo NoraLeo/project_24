@@ -1,15 +1,16 @@
 package simpledb.execution;
 
-import java.io.IOException;
-import simpledb.common.Type;
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.Type;
 import simpledb.storage.BufferPool;
 import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+
+import java.io.IOException;
 
 /**
  * Inserts tuples read from the child operator into the tableId specified in the
@@ -18,11 +19,7 @@ import simpledb.transaction.TransactionId;
 public class Insert extends Operator {
 
     private static final long serialVersionUID = 1L;
-    private TransactionId t;
-    private OpIterator child;
-    private int tableId;
-    private TupleDesc td;
-    private boolean fetched = false;
+
     /**
      * Constructor.
      *
@@ -36,43 +33,48 @@ public class Insert extends Operator {
      *             if TupleDesc of child differs from table into which we are to
      *             insert.
      */
+    TransactionId tid;
+    OpIterator child;
+    int tableId;
+    boolean called;
+
     public Insert(TransactionId t, OpIterator child, int tableId)
             throws DbException {
         // some code goes here
-        this.t = t;
-        this.child = child;
-        this.tableId = tableId;
-        this.td = new TupleDesc(new Type[] {Type.INT_TYPE});
-        if (!child.getTupleDesc().equals(Database.getCatalog().getTupleDesc(tableId))) {
-            throw new DbException("TupleDesc of child differs from table into which we are to insert");
+        if (!Database.getCatalog().getTupleDesc(tableId).equals(child.getTupleDesc())) {
+            throw new DbException("does not match");
         }
 
+        this.tid = t;
+        this.child = child;
+        this.tableId = tableId;
     }
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return this.td;
+//        return child.getTupleDesc();
+        return new TupleDesc(new Type[]{Type.INT_TYPE});
     }
-    
 
     public void open() throws DbException, TransactionAbortedException {
         // some code goes here
+        this.called = false;
+        child.open();
         super.open();
-        this.child.open();
-        this.fetched = false;
+
+
     }
 
     public void close() {
         // some code goes here
+        child.close();
         super.close();
-        this.child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
-        this.child.rewind();
-        this.close();
-        this.open();
+        close();
+        open();
     }
 
     /**
@@ -90,36 +92,38 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        if (this.fetched) {
+        if (called) {
             return null;
         }
+        called = true;
+
         int count = 0;
-        this.fetched = true;
-        
-        while (this.child.hasNext()) {
-            Tuple tuple = this.child.next();
+        while(child.hasNext()) {
             count++;
             try {
-                Database.getBufferPool().insertTuple(this.t, this.tableId, tuple);
-            } catch (DbException | IOException | TransactionAbortedException e) {
-                e.printStackTrace();
+                Database.getBufferPool().insertTuple(tid, tableId, child.next());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
 
-        Tuple result = new Tuple(this.td);
-        result.setField(0, new IntField(count));
-        return result;
+        // new tuple with one field
+        Tuple tuple = new Tuple(new TupleDesc(new Type[]{Type.INT_TYPE}));
+        tuple.setField(0, new IntField(count));
+        return tuple;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return new OpIterator[] {this.child};
+        return new OpIterator[] {child};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
-        this.child = children[0];
+        if (children.length > 0) {
+            child = children[0];
+        }
     }
 }
