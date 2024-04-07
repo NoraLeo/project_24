@@ -8,7 +8,6 @@ import java.io.*;
  * Transaction encapsulates information about the state of
  * a transaction and manages transaction commit / abort.
  */
-
 public class Transaction {
     private final TransactionId tid;
     volatile boolean started = false;
@@ -43,22 +42,25 @@ public class Transaction {
 
     /** Handle the details of transaction commit / abort */
     public void transactionComplete(boolean abort) throws IOException {
-
         if (started) {
-            //write abort log record and rollback transaction
+            // Write abort log record and rollback transaction
             if (abort) {
                 Database.getLogFile().logAbort(tid); //does rollback too
-            } 
+            } else {
+                // Write all the dirty pages for this transaction out
+                Database.getBufferPool().flushPages(tid);
+                Database.getLogFile().logCommit(tid);
+            }
 
             // Release locks and flush pages if needed
             Database.getBufferPool().transactionComplete(tid, !abort); // release locks
 
-            // write commit log record
+            // Write commit log record
             if (!abort) {
-            	Database.getLogFile().logCommit(tid);
+                Database.getLogFile().logCommit(tid);
             }
 
-            //setting this here means we could possibly write multiple abort records -- OK?
+            // Setting this here means we could possibly write multiple abort records -- OK?
             started = false;
         }
     }

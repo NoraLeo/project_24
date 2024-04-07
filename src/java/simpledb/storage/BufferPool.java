@@ -4,8 +4,7 @@ import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
 import simpledb.common.DeadlockException;
-import simpledb.transaction.TransactionAbortedException;
-import simpledb.transaction.TransactionId;
+import simpledb.transaction.*;
 
 import java.io.*;
 import java.util.HashMap;
@@ -36,17 +35,15 @@ import javax.xml.crypto.Data;
 public class BufferPool {
     /** Bytes per page, including header. */
     private static final int DEFAULT_PAGE_SIZE = 4096;
-
     private static int pageSize = DEFAULT_PAGE_SIZE;
     
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
-
     private final int numPage;
-
     private final Map<PageId, Page> pagePool;
+    private final LockManager lockManager;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -57,7 +54,7 @@ public class BufferPool {
     public BufferPool(int numPages) {;
         this.numPage = numPages;
         this.pagePool = new ConcurrentHashMap<>();
-        
+        this.lockManager = new LockManager();
     }
     
     public static int getPageSize() {
@@ -91,17 +88,28 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
-            if (this.pagePool.containsKey(pid)) {
-                return this.pagePool.get(pid);
-            }
+            if (perm == Permissions.READ_WRITE) {this.lockManager.obtainWriteLock(tid, pid);} 
+            else if (perm == Permissions.READ_ONLY) {this.lockManager.obtainReadLock(tid, pid);} 
+            else {throw new DbException("Invalid permission type.");}
+            
+            synchronized(this){
+                if (this.pagePool.containsKey(pid)) {
+                    Page page = this.pagePool.get(pid);
+                    this.pagePool.remove(pid);
+                    this.pagePool.put(pid, page);
+                    return page; 
+                }
+                Page modifiedPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
 
-            if (this.pagePool.size() >= this.numPage) {
-                evictPage();
+                if (this.pagePool.size() >= this.numPage) {evictPage();}
+                if (perm == Permissions.READ_WRITE) {modifiedPage.markDirty(true, tid);}
+                try {
+                    updatePageInBufferPool(modifiedPage);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return modifiedPage;                
             }
-
-            Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
-            this.pagePool.put(pid, page);
-            return page;
     }
 
     /**
@@ -116,6 +124,7 @@ public class BufferPool {
     public  void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        this.lockManager.releaseLock(tid, pid);
     }
 
     /**
@@ -126,13 +135,14 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
+        this.transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
-    public boolean holdsLock(TransactionId tid, PageId p) {
+    public boolean holdsLock(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return this.lockManager.holdsLock(tid, pid);
     }
 
     /**
@@ -145,6 +155,21 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        Set<PageId> pageIdSet = this.lockManager.getPagesHeldBy(tid);
+        if (pageIdSet == null) {return;}  
+        if (commit) {
+            for (PageId pageId : pageIdSet) {
+                try {
+                    this.flushPage(pageId);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            for (PageId pageId : pageIdSet)
+                this.discardPage(pageId);
+        }
+        this.lockManager.releaseAllLocks(tid);
     }
 
     /**
@@ -272,6 +297,9 @@ public class BufferPool {
     public synchronized  void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        for (PageId pid : this.lockManager.getPagesHeldBy(tid)) {
+            this.flushPage(pid);
+        }
     }
 
     /**
