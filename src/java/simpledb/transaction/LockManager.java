@@ -7,15 +7,6 @@ import simpledb.storage.PageId;
 
 public class LockManager {
   // Essentially, LockManager tracks which locks each transactions holds and checks if locks should be granted to a transaction
-  // lock
-  // unlock
-  // track locks held by each transaction
-  // grant locks to transactions
-
-  // S(A)-->shared lock --> read
-  // X(A)-->exclusive lock --> read and write
-  // U(A)-->release lock --> when the transaction commit
-  // https://sutd50043.github.io/notes/l9_transaction_concurrency/
 
   // Map to store locks associated with each page
   Map<PageId, ReadWriteLock> pageLockManager;
