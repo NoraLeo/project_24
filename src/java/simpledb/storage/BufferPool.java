@@ -307,29 +307,30 @@ public class BufferPool {
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
-    private synchronized  void evictPage() throws DbException {
-        // some code goes here
-        // not necessary for lab1
-        Iterator<PageId> iterator = this.pagePool.keySet().iterator();
+    private synchronized void evictPage() throws DbException {
+        Iterator<PageId> iter = this.pagePool.keySet().iterator();
+        boolean foundOneDirtyPage = false;
+        Page lruPage = null;
 
-        Page lastruPage = null;
-
-        while (iterator.hasNext()) {
-            Page pg = this.pagePool.get(iterator.next());
+        while (iter.hasNext()) {
+            Page pg = this.pagePool.get(iter.next());
+            // Skip dirty pages for "NO STEAL" policy
             if (pg.isDirty() == null) {
-                lastruPage = pg;
+                foundOneDirtyPage = true;
+                lruPage = pg;
+                try {
+                    this.flushPage(lruPage.getId());
+                    this.pagePool.remove(lruPage.getId());
+                } catch (IOException e) {
+                    throw new DbException("Page could not be flushed.");
+                }
             }
         }
-
-        if (lastruPage == null) {
-            throw new DbException("No pages to evict in the BufferPool");
+        if (!foundOneDirtyPage) {
+            throw new DbException("All pages are dirty!");
         }
-
-        try {
-            this.flushPage(lastruPage.getId());
-        } catch (IOException e) {
-            throw new DbException("The specified page could not be flushed.");
+        if (lruPage == null) {
+            throw new DbException("There are no pages to evict in the buffer pool.");
         }
-        this.pagePool.remove(lastruPage.getId());
     }
 }

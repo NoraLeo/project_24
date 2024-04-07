@@ -34,7 +34,7 @@ public class HeapFile implements DbFile {
     private int fid;
     public HeapFile(File f, TupleDesc td) {
         // some code goes here
-        file = f;
+        this.file = f;
         this.td = td;
     }
 
@@ -45,7 +45,7 @@ public class HeapFile implements DbFile {
      */
     public File getFile() {
         // some code goes here
-        return file;
+        return this.file;
     }
 
     /**
@@ -59,7 +59,7 @@ public class HeapFile implements DbFile {
      */
     public int getId() {
         // some code goes here
-        return file.getAbsoluteFile().hashCode();
+        return this.file.getAbsoluteFile().hashCode();
     }
 
     /**
@@ -69,7 +69,7 @@ public class HeapFile implements DbFile {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return td;
+        return this.td;
     }
 
     // see DbFile.java for javadocs
@@ -115,7 +115,7 @@ public class HeapFile implements DbFile {
      * Returns the number of pages in this HeapFile.
      */
     public int numPages() {
-        return (int) (file.length()/BufferPool.getPageSize());
+        return (int) (this.file.length()/BufferPool.getPageSize());
     }
 
     // see DbFile.java for javadocs
@@ -126,9 +126,9 @@ public class HeapFile implements DbFile {
         List<Page> pages = new ArrayList<>();
 
         // find a page with space
-        for (int idx = 0; idx < numPages(); idx++ ){
+        for (int idx = 0; idx < this.numPages(); idx++ ){
 
-            HeapPageId pid = new HeapPageId(getId(), idx);
+            HeapPageId pid = new HeapPageId(this.getId(), idx);
 
             HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_ONLY);
 
