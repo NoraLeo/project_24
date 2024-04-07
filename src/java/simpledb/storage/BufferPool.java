@@ -101,7 +101,7 @@ public class BufferPool {
                 }
                 Page modifiedPage = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
 
-                if (this.pagePool.size() >= this.numPage) {evictPage();}
+                if (this.pagePool.size() >= this.numPage) {this.evictPage();}
                 if (perm == Permissions.READ_WRITE) {modifiedPage.markDirty(true, tid);}
                 try {
                     updatePageInBufferPool(modifiedPage);
