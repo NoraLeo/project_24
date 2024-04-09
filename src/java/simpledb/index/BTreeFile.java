@@ -184,11 +184,43 @@ public class BTreeFile implements DbFile {
 	 * @return the left-most leaf page possibly containing the key field f
 	 * 
 	 */
-	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm,
-                                       Field f)
-					throws DbException, TransactionAbortedException {
-		// some code goes here
-        return null;
+	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm, Field f)
+        throws DbException, TransactionAbortedException {
+    // Depending on the type of page id, the method acts differently.
+		switch(pid.pgcateg()){
+			case BTreePageId.LEAF:
+				// If the current page is a leaf, return it directly after ensuring it is accessible with the given permissions.
+				return (BTreeLeafPage) getPage(tid, dirtypages, pid, perm);
+
+			case BTreePageId.INTERNAL:
+				// If the current page is internal, navigate through its entries to find the appropriate child.
+				BTreeInternalPage page = (BTreeInternalPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+				Iterator<BTreeEntry> iter = page.iterator();
+				if (iter == null || !iter.hasNext()) {
+					// If the internal page has no entries, this is an error.
+					throw new DbException("No elements left to iterate.");
+				}
+				if (f == null) {
+					// If no field is specified, recursively search using the leftmost child.
+					return findLeafPage(tid, dirtypages, iter.next().getLeftChild(), perm, f);
+				}
+				BTreeEntry entry = null;
+				while (iter.hasNext()) {
+					entry = iter.next();
+					if (entry.getKey().compare(Op.GREATER_THAN_OR_EQ, f)) {
+						// If the entry's key is greater than or equal to the field, search left.
+						return findLeafPage(tid, dirtypages, entry.getLeftChild(), perm, f);
+					}
+				}
+				// If we get here, the field is greater than all keys, so search the rightmost child.
+				return findLeafPage(tid, dirtypages, entry.getRightChild(), perm, f);
+
+			case BTreePageId.HEADER:
+			case BTreePageId.ROOT_PTR:
+			default:
+				// If the page type is neither internal nor leaf, it's an error.
+				throw new DbException("Unsupported type.");
+		}
 	}
 	
 	/**
