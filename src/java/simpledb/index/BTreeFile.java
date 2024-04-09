@@ -271,8 +271,47 @@ public class BTreeFile implements DbFile {
 		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
 		// the sibling pointers of all the affected leaf pages.  Return the page into which a 
 		// tuple with the given key field should be inserted.
-        return null;
-		
+        BTreeLeafPage right = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		Iterator<Tuple> tups = page.reverseIterator();
+
+		if (tups == null || !tups.hasNext()) {
+			throw new DbException("No more tuples.");
+		}
+
+		int tuplenum = page.getNumTuples();
+		for (int i=0; i < tuplenum / 2; ++i) {
+			if (!tups.hasNext()) {
+				throw new DbException("No more tuples.");
+			}
+			Tuple tuple = tups.next();
+			page.deleteTuple(tuple);
+			right.insertTuple(tuple);
+		}
+
+		// If there is a right neighbor, update its pointer
+		if (page.getRightSiblingId() != null) {
+			BTreePageId oldRightId = page.getRightSiblingId();
+			BTreeLeafPage oldright = (BTreeLeafPage) getPage(tid, dirtypages, oldRightId, Permissions.READ_WRITE);
+			oldright.setLeftSiblingId(right.getId());
+		}
+
+		right.setLeftSiblingId(page.getId());
+		right.setRightSiblingId(page.getRightSiblingId());
+		page.setRightSiblingId(right.getId());
+
+		if (!tups.hasNext()) {
+			throw new DbException("No more tuples.");
+		}
+
+		Field index = right.iterator().next().getField(keyField);
+
+		BTreeEntry entry = new BTreeEntry(index, page.getId(), right.getId());
+
+		BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), index);
+		parentPage.insertEntry(entry);
+		updateParentPointers(tid, dirtypages, parentPage);
+
+        return (field.compare(Op.GREATER_THAN_OR_EQ, index) ? right : page);
 	}
 	
 	/**
@@ -309,7 +348,36 @@ public class BTreeFile implements DbFile {
 		// the parent pointers of all the children moving to the new page.  updateParentPointers()
 		// will be useful here.  Return the page into which an entry with the given key field
 		// should be inserted.
-		return null;
+		BTreeInternalPage right = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+		Iterator<BTreeEntry> entries = page.reverseIterator();
+		if(entries == null || !entries.hasNext())
+			throw new DbException("Internal page has no entries!");
+		int numEntry = page.getNumEntries();
+		for (int i=0; i < numEntry / 2; ++i) {
+			if (!entries.hasNext()) {
+				throw new DbException("No more entries.");
+			}
+			BTreeEntry entry = entries.next();
+			page.deleteKeyAndRightChild(entry);	
+			right.insertEntry(entry);		
+		}
+
+		if (!entries.hasNext()) {
+			throw new DbException("No more entries.");
+		}
+
+		BTreeEntry e = entries.next();
+		Field index = e.getKey();
+		page.deleteKeyAndRightChild(e);	
+
+		BTreeEntry newEntry = new BTreeEntry(index, page.getId(), right.getId());
+		BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), index);
+		parentPage.insertEntry(newEntry);
+
+		updateParentPointers(tid, dirtypages, parentPage);
+		updateParentPointers(tid, dirtypages, right);
+
+		return field.compare(Op.GREATER_THAN_OR_EQ, index) ? right : page;
 	}
 	
 	/**
@@ -718,9 +786,9 @@ public class BTreeFile implements DbFile {
 	 * @param tid - the transaction id
 	 * @param dirtypages - the list of dirty pages which should be updated with all new dirty pages
 	 * @param leftPage - the left leaf page
-	 * @param rightPage - the right leaf page
+	 * @param right - the right leaf page
 	 * @param parent - the parent of the two pages
-	 * @param parentEntry - the entry in the parent corresponding to the leftPage and rightPage
+	 * @param parentEntry - the entry in the parent corresponding to the leftPage and right
 	 * @see #deleteParentEntry(TransactionId, Map, BTreePage, BTreeInternalPage, BTreeEntry)
 	 * 
 	 * @throws DbException
@@ -728,7 +796,7 @@ public class BTreeFile implements DbFile {
 	 * @throws TransactionAbortedException
 	 */
 	public void mergeLeafPages(TransactionId tid, Map<PageId, Page> dirtypages,
-			BTreeLeafPage leftPage, BTreeLeafPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry) 
+			BTreeLeafPage leftPage, BTreeLeafPage right, BTreeInternalPage parent, BTreeEntry parentEntry) 
 					throws DbException, IOException, TransactionAbortedException {
 
 		// some code goes here
@@ -749,9 +817,9 @@ public class BTreeFile implements DbFile {
 	 * @param tid - the transaction id
 	 * @param dirtypages - the list of dirty pages which should be updated with all new dirty pages
 	 * @param leftPage - the left internal page
-	 * @param rightPage - the right internal page
+	 * @param right - the right internal page
 	 * @param parent - the parent of the two pages
-	 * @param parentEntry - the entry in the parent corresponding to the leftPage and rightPage
+	 * @param parentEntry - the entry in the parent corresponding to the leftPage and right
 	 * @see #deleteParentEntry(TransactionId, Map, BTreePage, BTreeInternalPage, BTreeEntry)
 	 * @see #updateParentPointers(TransactionId, Map, BTreeInternalPage)
 	 * 
@@ -760,7 +828,7 @@ public class BTreeFile implements DbFile {
 	 * @throws TransactionAbortedException
 	 */
 	public void mergeInternalPages(TransactionId tid, Map<PageId, Page> dirtypages,
-			BTreeInternalPage leftPage, BTreeInternalPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry) 
+			BTreeInternalPage leftPage, BTreeInternalPage right, BTreeInternalPage parent, BTreeEntry parentEntry) 
 					throws DbException, IOException, TransactionAbortedException {
 		
 		// some code goes here
